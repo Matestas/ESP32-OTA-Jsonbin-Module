@@ -90,8 +90,6 @@ Support for other HTTPS providers or custom servers is **not guaranteed** becaus
 
 ---
 
-Want me to add this into your README?
-
 ## Notes on `main.c`
 
 The included `main.c` file is just a simple test/demo application to show how the OTA module can be used. It is **not required** for the OTA module itself to function.
