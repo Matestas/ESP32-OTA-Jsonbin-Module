@@ -19,3 +19,7 @@ components/*
 
 # Credentials file
 main/credentials.h
+
+# SDK configuration files
+sdkconfig
+sdkconfig.old

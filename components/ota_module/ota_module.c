@@ -10,12 +10,18 @@
 #include "cJSON.h"
 
 #define USE_HTTPS 1
+#define USE_GITHUB 1
 
 #ifdef USE_HTTPS
     extern const uint8_t jsonbin_cacerts_pem_start[] asm("_binary_jsonbin_cacerts_pem_start");
     extern const uint8_t jsonbin_cacerts_pem_end[]   asm("_binary_jsonbin_cacerts_pem_end");
 #else
     
+#endif
+
+#ifdef USE_GITHUB
+    extern const uint8_t github_cacerts_pem_start[] asm("_binary_github_cacerts_pem_start");
+    extern const uint8_t github_cacerts_pem_end[]   asm("_binary_github_cacerts_pem_end");
 #endif
 
 extern double version; // Global variable to hold the firmware version
@@ -97,7 +103,7 @@ esp_err_t __http_event_handler(esp_http_client_event_t* evt) {
                             version_read = item->valuedouble;
                             ESP_LOGI(TAG, "Firmware version: %.2f", version_read);
                         } else if (strcmp(item->string, "firmware_bin") == 0 && cJSON_IsString(item)) {
-                            ota_firmware_bin = item->valuestring;
+                            ota_firmware_bin = strdup(item->valuestring); // or malloc+strcpy
                             ESP_LOGI(TAG, "Firmware Bin URL found: %s", ota_firmware_bin);
                         }
                     }
@@ -168,8 +174,8 @@ void ota_task(void *pvParameters)
                 const esp_http_client_config_t ota_http_client_config = {
                     .url = ota_firmware_bin,
                     
-                    #if USE_HTTPS
-                        .cert_pem = (const char *) jsonbin_cacerts_pem_start,
+                    #if USE_GITHUB
+                        .cert_pem = (const char *)github_cacerts_pem_start,
                     #else
                         .cert_pem = NULL,
                     #endif
@@ -198,8 +204,9 @@ void ota_task(void *pvParameters)
         }
 
         esp_http_client_cleanup(client);
-
+        
         if(ret == ESP_OK) {
+            free(ota_firmware_bin); // Free the allocated memory for the firmware binary URL
             esp_restart(); // Restart the device if the update was successful
         }
         vTaskDelay(pdMS_TO_TICKS(600000)); // Delay for 1 second before retrying
