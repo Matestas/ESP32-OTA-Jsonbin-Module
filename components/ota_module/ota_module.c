@@ -23,7 +23,7 @@ extern double version; // Global variable to hold the firmware version
 const char* TAG = "OTA_MODULE";
 
 char *ota_url;
-char rcv_buffer[256];
+char rcv_buffer[2056];
 char *ota_master_key; 
 char *ota_access_key;
 uint8_t is_master_key_set = 0; // Flag to check if master key is set
@@ -58,63 +58,65 @@ void ota_set_acess_key(const char *key)
 /* Event handler for catching system events */
 
 
-esp_err_t __http_event_handler(esp_http_client_event_t* evt){
-    
-    if (evt->event_id == HTTP_EVENT_ON_DATA) {
-        // Allocate buffer for incoming data + null terminator
-        char *json_str = malloc(evt->data_len + 1);
-        if (!json_str) {
-            ESP_LOGE(TAG, "Allocation failed");
-            return ESP_FAIL;
-        }
+esp_err_t __http_event_handler(esp_http_client_event_t* evt) {
+    static char *json_buffer = NULL;
+    static int json_buffer_len = 0;
 
-        memcpy(json_str, evt->data, evt->data_len);
-        json_str[evt->data_len] = '\0';
-       
-        
-        // Try to parse JSON
-        cJSON *root = cJSON_Parse(json_str);
-        free(json_str);  // Free buffer immediately after parsing
-        
-        if (!root) {
-            ESP_LOGW(TAG, "Received data is NOT valid JSON, discarding");
-            return ESP_OK;  // Return OK but do not process further
-        }
-
-        cJSON *item = NULL;
-        cJSON_ArrayForEach(item, root) {
-            // Check if the item is a number and has a string key
-            if (item->string != NULL) {
-                if (strcmp(item->string, "version") == 0) {
-
-                    if(cJSON_IsNumber(item)) {
-                        
-                        version_read = item->valuedouble;
-                        ESP_LOGI(TAG, "Firmware version: %.2f", version_read);
-                                               
-                    }
-                    else
-                    {
-                        version_read = 0.0; // Reset version_read if not a number
-                        ESP_LOGE(TAG, "Version is NULL");
-                    }
-                }
-                if (strcmp(item->string, "firmware_bin") == 0) {
-                    if(cJSON_IsString(item)) {
-                        ota_firmware_bin = item->valuestring;
-                        ESP_LOGI(TAG, "Firmware Bin URL found: %s", ota_firmware_bin);
-                    }
-                }
-            
+    switch (evt->event_id) {
+        case HTTP_EVENT_ON_DATA:
+            // Grow buffer to hold accumulated data
+            json_buffer = realloc(json_buffer, json_buffer_len + evt->data_len + 1);
+            if (!json_buffer) {
+                ESP_LOGE(TAG, "Allocation failed");
+                return ESP_FAIL;
             }
 
-        
-        }
-        cJSON_Delete(root);
+            // Copy new data to the end
+            memcpy(json_buffer + json_buffer_len, evt->data, evt->data_len);
+            json_buffer_len += evt->data_len;
+            json_buffer[json_buffer_len] = '\0'; // Always null-terminate
+            break;
+
+        case HTTP_EVENT_ON_FINISH:
+            if (!json_buffer) {
+                ESP_LOGW(TAG, "No data received to parse");
+                break;
+            }
+
+            ESP_LOGI(TAG, "data: %s", json_buffer);
+
+            cJSON *root = cJSON_Parse(json_buffer);
+
+            if (!root) {
+                ESP_LOGW(TAG, "Received data is NOT valid JSON, discarding");
+            } else {
+                cJSON *item = NULL;
+                cJSON_ArrayForEach(item, root) {
+                    if (item->string != NULL) {
+                        if (strcmp(item->string, "version") == 0 && cJSON_IsNumber(item)) {
+                            version_read = item->valuedouble;
+                            ESP_LOGI(TAG, "Firmware version: %.2f", version_read);
+                        } else if (strcmp(item->string, "firmware_bin") == 0 && cJSON_IsString(item)) {
+                            ota_firmware_bin = item->valuestring;
+                            ESP_LOGI(TAG, "Firmware Bin URL found: %s", ota_firmware_bin);
+                        }
+                    }
+                }
+                cJSON_Delete(root);
+            }
+
+            free(json_buffer);
+            json_buffer = NULL;
+            json_buffer_len = 0;
+            break;
+
+        default:
+            break;
     }
 
-    return ESP_OK;  
+    return ESP_OK;
 }
+
 
 void ota_task(void *pvParameters)
 {
@@ -150,7 +152,9 @@ void ota_task(void *pvParameters)
         if(is_access_key_set == 1 && ota_access_key != NULL){
             esp_http_client_set_header(client, "X-Access-Key", ota_access_key);
         }
-
+        if(is_master_key_set == 1 || is_access_key_set == 1){
+            esp_http_client_set_header(client, "X-Bin-Meta", "false");
+        }
         esp_http_client_set_header(client, "Content-Type", "application/json");
         ret = esp_http_client_perform(client);
 

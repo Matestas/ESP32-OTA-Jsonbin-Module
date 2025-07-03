@@ -1,0 +1,21 @@
+# Ignore everything in build except the OTA binary
+build/**
+!build/OTA_TEST.bin
+
+# Ignore editor and tooling folders
+.vscode/
+.devcontainer/
+
+# Ignore environment and config files
+launch.json
+settings.json
+c_cpp_properties.json
+sdkconfig.old
+dependencies.lock
+
+# Ignore all components except ota_module
+components/*
+!components/ota_module
+
+# Credentials file
+main/credentials.h

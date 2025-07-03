@@ -8,7 +8,7 @@
 
 #define USE_EXTERNAL_CREDENTIALS
     
-double version = 0.1; // Global variable to hold the firmware version
+double version = 0.2; // Global variable to hold the firmware version
 
 #ifdef USE_EXTERNAL_CREDENTIALS
     #include "credentials.h"
