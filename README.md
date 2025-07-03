@@ -30,12 +30,12 @@ Create a JSON bin on [Jsonbin.io](https://jsonbin.io/) with the structure:
 ```json
 {
   "version": 1.0,  # use only one dot
-  "bin_url": "https://example.com/firmware.bin"
+  "firmware_bin": "https://example.com/firmware.bin"
 }
 ````
 
 * `version`: semantic version string of the firmware
-* `bin_url`: direct HTTPS URL to the firmware binary
+* `firmware_bin`: direct HTTPS URL to the firmware binary
 
 ### 2. Configure the Project
 
